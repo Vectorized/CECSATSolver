@@ -16,10 +16,17 @@ public class SATSolverTest {
     Literal nb = b.getNegation();
     Literal nc = c.getNegation();
 
-
-
-	
-	// TODO: add the main method that reads the .cnf file and calls SATSolver.solve to determine the satisfiability
+    public static void main(String[] args) {
+        // TODO: read in and parse a .cnf file
+        // TODO: construct Formula from cnf data
+        Formula formula = new Formula();
+        System.out.println("SAT solver starts.");
+        long timeStart = System.nanoTime();
+        Environment e = SATSolver.solve(formula);
+        long timeEnd = System.nanoTime();
+        long timeTaken = timeEnd - timeStart;
+        System.out.println("Time: " + timeTaken/1000000.0 + "ms");   
+    }
     
 	// TODO: put your test cases for SATSolver.solve here
 	
