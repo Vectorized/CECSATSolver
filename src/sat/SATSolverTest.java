@@ -1,14 +1,67 @@
 package sat;
 
-import static org.junit.Assert.*;
-
-import org.junit.Test;
-
-import sat.env.*;
-import sat.formula.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Random;
+import java.util.TreeMap;
 
 
 public class SATSolverTest {
+	
+	public static void main(String[] args) {
+		
+		long started = System.nanoTime();
+		System.out.println("YOS");
+		
+		/*
+		TreeMap<Integer, Integer> testMap = new TreeMap<Integer, Integer>();
+		int members = 6000;
+		for (int i=0; i<members; ++i){
+			testMap.put(i, i);
+		}
+		for (int j=0; j<10000;++j){
+		for (int i=0; i<members; ++i){
+			testMap.get(i);
+		}
+		}
+		*/
+		
+		
+		ArrayList<String> testList = new ArrayList<String>();
+		int members = 600000;
+		for (int i=0; i<members; ++i) {
+			testList.add("Ewqeq");
+			testList.remove(testList.size()-1);
+		}/*
+		for (int j=0; j<100000;++j){
+
+			for (int k=0; k<testList.size();++k) {
+				String string = testList.get(k);
+			}
+		}*/
+		
+		
+		/*
+		ArrayDeque<String> testDeque = new ArrayDeque<String>();
+		int members = 6000;
+		for (int i=0; i<members; ++i) {
+			testDeque.add("Ewqeq");
+		}
+		for (int j=0; j<100000;++j){
+
+			for (String s:testDeque) {
+			}
+		}*/
+
+
+		long timeTaken = System.nanoTime()-started;
+		System.out.println(timeTaken);
+		System.out.println("BYES");
+
+	}
+	
+	/*
     Literal a = PosLiteral.make("a");
     Literal b = PosLiteral.make("b");
     Literal c = PosLiteral.make("c");
@@ -66,6 +119,6 @@ public class SATSolverTest {
         return c;
     }
     
-    
+    */
     
 }
