@@ -10,16 +10,23 @@ public class SLiteralPool {
 	public HashMap<String, SLiteral> negativeLiteralsHashMap;
 	public ArrayList<SLiteral> literalSelectionList;
 	
+	public int[] l1Cache;
+	public int l1CachePointer;
+	
+	public static final int L1_CACHE_SIZE = 4; 
+	
 	public SLiteralPool() {
 		positiveLiteralsHashMap = new HashMap<String, SLiteral>();
 		negativeLiteralsHashMap = new HashMap<String, SLiteral>();
 		literalSelectionList = new ArrayList<SLiteral>();
+		l1Cache = new int[L1_CACHE_SIZE];
+		l1CachePointer = 0;
 	}
 	
 	public SLiteral getPositiveLiteralWithString(String s) {
 		if (positiveLiteralsHashMap.containsKey(s)) {
 			SLiteral literal = positiveLiteralsHashMap.get(s);
-			literal.incrementPriority();
+			++literal.priority;
 			return literal;
 		} else {
 			SLiteral positiveLiteral = new SLiteral(/*isNegative*/false);
@@ -36,7 +43,7 @@ public class SLiteralPool {
 	public SLiteral getNegativeLiteralWithString(String s){
 		if (negativeLiteralsHashMap.containsKey(s)) {
 			SLiteral literal = negativeLiteralsHashMap.get(s);
-			literal.incrementPriority();
+			++literal.priority;
 			return literal;
 		} else {
 			SLiteral negativeLiteral = new SLiteral(/*isNegative*/true);
@@ -63,29 +70,21 @@ public class SLiteralPool {
 	
 	public SLiteral getUnassignedLiteral(){
 		int literalSelectionListSize = this.literalSelectionList.size();
-		for (int i=0; i<literalSelectionListSize; ++i) {
+		int i=0;
+		for (i=0; i<L1_CACHE_SIZE; ++i){
+			SLiteral l = literalSelectionList.get(l1Cache[i]);
+			if (!l.assigned) { return l; }
+		}
+		for (i=0; i<literalSelectionListSize; ++i) {
 			SLiteral l = literalSelectionList.get(i);
-			if (!l.assigned) return l;
+			if (!l.assigned) {
+				l1Cache[(l1CachePointer++)%L1_CACHE_SIZE] = i;
+				return l;
+			}
 		}
 		return null;
 	}
-	
-	public void printStrings() {
-		for (String s: positiveLiteralsHashMap.keySet()) {
-			System.out.println(s);
-		}
-	}
-	
-	public void printLiterals(){
-		for (String s: positiveLiteralsHashMap.keySet()) {
-			SLiteral l = positiveLiteralsHashMap.get(s);
-			if (l.assigned) {
-				System.out.println(s + ": "+ l.value);
-			} else {
-				System.out.println(s + ": Unassigned");
-			}
-		}
-	}
+
 	
 	
 }

@@ -1,8 +1,22 @@
 package sat;
 
+import immutable.ImList;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 
+
+import java.util.Map;
+
+import sat.env.Bool;
+import sat.env.Environment;
+import sat.env.Variable;
+import sat.formula.Clause;
+import sat.formula.Formula;
+import sat.formula.Literal;
+import sat.formula.PosLiteral;
 
 
 public class SATSolver {
@@ -11,71 +25,88 @@ public class SATSolver {
 	public ArrayList<SClause> clauses;
 	public ArrayDeque<SLiteral> assignedLiterals;
 	
-	/*
+	/**
+	 * Takes in a Formula representing a Boolean Satisfiability problem represented in CNF format.
+	 * It attempts to search for a possible solution to the problem.
+	 * If no solution is found, null is returned.
+	 * 
+	 * @param formula A Formula representing an Boolean Satisfiability problem represented in CNF format.
+	 * @return An Environment containing a possible solution to Formula. 
+	 */
     public static Environment solve(Formula formula) {
 
-        throw new RuntimeException("not yet implemented.");
-    }*/
-	
-	public static void main(String[] args) {
-
-		SATSolver solver = new SATSolver();
-		SClause c1 = new SClause();
-		c1.addLiteral(solver.sLiteralPool.getPositiveLiteralWithString("a"));
-
-		
-		SClause c2 = new SClause();
-		c2.addLiteral(solver.sLiteralPool.getNegativeLiteralWithString("a"));
-		
-		SClause c3 = new SClause();
-		c3.addLiteral(solver.sLiteralPool.getPositiveLiteralWithString("b"));
-		
-		SClause c4 = new SClause();
-		c4.addLiteral(solver.sLiteralPool.getNegativeLiteralWithString("b"));
-
-		for (int i=0; i<10000; ++i) {
-			c1.addLiteral(solver.sLiteralPool.getNegativeLiteralWithString(Integer.toString(i)));
-			c2.addLiteral(solver.sLiteralPool.getNegativeLiteralWithString(Integer.toString(i+1)));
-			c3.addLiteral(solver.sLiteralPool.getNegativeLiteralWithString(Integer.toString(i+2)));
-			c4.addLiteral(solver.sLiteralPool.getNegativeLiteralWithString(Integer.toString(i+3)));
+    	SATSolver solver = new SATSolver(formula.getSize());
+    	
+    	//Converting the Formula to internal data structures optimized for more efficiency
+		ImList<Clause> clauseList = formula.getClauses();
+		for (Clause c:clauseList) {
+			Iterator<Literal> literalIterator = c.iterator();
+			
+			SClause newClause = new SClause();
+			while (literalIterator.hasNext()) {
+				Literal literal = literalIterator.next();
+				String variable = literal.getVariable().toString();
+				if (literal instanceof PosLiteral) {
+					newClause.addLiteral(solver.sLiteralPool.getPositiveLiteralWithString(variable));
+				} else {
+					newClause.addLiteral(solver.sLiteralPool.getNegativeLiteralWithString(variable));
+				}
+			}
+			solver.clauses.add(newClause);
 		}
 		
-		solver.clauses.add(c1);
-		solver.clauses.add(c2);
-		solver.clauses.add(c3);
-		solver.clauses.add(c4);
+		//Prioritize the literals
+		solver.sLiteralPool.sortLiteralSelectionList();
 		
-		long started = System.nanoTime();
-		System.out.println(solver.attemptSolving(solver.clauses));
-		long timeTaken = System.nanoTime()-started;
-		System.out.println(timeTaken);
-		System.out.println("BYES");
-		
-		//solver.sLiteralPool.printLiterals();
-		
-	}
+		//Starts the solving process
+		Boolean solvable = solver.attemptSolving(solver.clauses);
+        
+		//If a solution is found, it starts repackaging it in an Environment instance before returning it
+		if (solvable==false) {
+        	return null;
+        } else {
+        	Environment environment = new Environment(); 
+        	HashMap<String, SLiteral> literalsHashMap = solver.sLiteralPool.positiveLiteralsHashMap;
+        	for (Map.Entry<String, SLiteral> entry : literalsHashMap.entrySet()) {
+        		String s = entry.getKey();
+        		SLiteral l = entry.getValue();
+        		if (l.assigned) { 
+        			environment = environment.put(new Variable(s), l.value ? Bool.TRUE:Bool.FALSE); 
+        		}
+        	}
+        	return environment;
+        }
+    }
 	
-	public SATSolver(){
+    /**
+     * A private constructor. The SAT Solver is only to be used by its solve method.
+     */
+	private SATSolver(int numberOfClauses){
 		this.sLiteralPool = new SLiteralPool();
-		this.clauses = new ArrayList<SClause>();
+		this.clauses = new ArrayList<SClause>(numberOfClauses);
 		this.assignedLiterals = new ArrayDeque<SLiteral>();
 	}
 
+	/**
+	 * This is the main recursive method of the DPLL algorithm
+	 * @return TRUE if the problem has a solution else FALSE. Leaves sLiteralPool containing the answer if TRUE.
+	 */
     private boolean attemptSolving(ArrayList<SClause> subClauses){
-    	//System.out.println("YOYO");
-    	if (isSolved(subClauses)) { return true; } 	
+    	if (isSolved(subClauses)) { return true; } 	//If solved, end search
     	
     	SLiteral lastLiteral = assignedLiterals.peekLast();
     	if (BCP(subClauses)==false) { //i.e the previous assignment caused a chain reaction of unit clauses that resulted in false
     		undoAssignmentsToLiteral(lastLiteral);
-    		return false;
+    		return false; 
     	}
-    	
+    	ArrayList<SClause> subSubClauses = notTrueSubClauses(subClauses);
     	
     	SLiteral unassignedLiteral = sLiteralPool.getUnassignedLiteral();
-    	if (unassignedLiteral==null) return true;
+    	if (unassignedLiteral==null) { 
+    		return true; 
+    	} 
     	unassignedLiteral.setEvalutateToTrue();
-    	ArrayList<SClause> subSubClauses = undeterminedSubClauses(subClauses);
+    	assignedLiterals.add(unassignedLiteral);
     	if (attemptSolving(subSubClauses)) {
     		return true;
     	}
@@ -84,30 +115,27 @@ public class SATSolver {
     		return true;
     	}
     	undoAssignmentsToLiteral(lastLiteral);
-    	assignedLiterals.removeLast().setUnassigned();
     	
     	return false;
     }
 
-    private ArrayList<SClause> undeterminedSubClauses(ArrayList<SClause> subClauses) {
-    	ArrayList<SClause> newSubClauses = new ArrayList<SClause>();
+    private ArrayList<SClause> notTrueSubClauses(ArrayList<SClause> subClauses) {
     	int subClausesSize = subClauses.size();
+    	ArrayList<SClause> newSubClauses = new ArrayList<SClause>(subClausesSize>>3);
     	for (int i=0; i<subClausesSize; ++i) {
     		SClause c = subClauses.get(i);
-    		if (c.isUndetermined()) { newSubClauses.add(c); }
+    		if (!c.isTrue()) { newSubClauses.add(c); }
     	}
     	return newSubClauses;
     }
     
-    
     private boolean BCP(ArrayList<SClause> subClauses) {    	
     	boolean finished = false;
+    	int subClausesSize = subClauses.size();
     	while (!finished) {
     		finished = true;
-        	int subClausesSize = subClauses.size();
         	for (int i=0; i<subClausesSize; ++i) {
         		SClause c = subClauses.get(i);
-        		
         		if (!c.ignoreByBCP){ //If clause has not yet been marked by BCP as ignorable
 	    			SLiteral unitLiteral = c.unassignedLiteralIfUnitClause();
 	    			if (unitLiteral!=null) { 
@@ -118,12 +146,12 @@ public class SATSolver {
 	    			} else if (c.isTrue()) {
 	    				c.ignoreByBCP = true;
 	    			} else if (c.isFalse()) { //Some unit clause caused a false to pop out... this means a dead end!
-	    				resetIgnoreByBCP(subClauses);
+	    		    	resetIgnoreByBCP(subClauses);
 	    				return false;
 	    			}
         		}
-        		
     		}
+
     	}
     	resetIgnoreByBCP(subClauses);
     	return true;
@@ -139,6 +167,7 @@ public class SATSolver {
     
     private void undoAssignmentsToLiteral(SLiteral s) {
     	while (assignedLiterals.peekLast()!=s) {
+    		if (assignedLiterals.peekLast()==null) { return; }
     		assignedLiterals.removeLast().setUnassigned();
     	}
     }
