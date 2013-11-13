@@ -9,8 +9,7 @@ public class SATSolverTest {
 	
 	public static void main(String[] args) {
 		
-		
-        Formula formula = CNFParser.formulaFromFile("cnf/160y.cnf", false);
+        Formula formula = CNFParser.formulaFromFile("cnf/038y.cnf", false);
         System.out.println("SAT solver starts.");
         
 		long started = System.nanoTime();

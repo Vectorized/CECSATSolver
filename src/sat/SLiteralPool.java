@@ -10,17 +10,17 @@ public class SLiteralPool {
 	public HashMap<String, SLiteral> negativeLiteralsHashMap;
 	public ArrayList<SLiteral> literalSelectionList;
 	
-	public int[] l1Cache;
-	public int l1CachePointer;
-	
-	public static final int L1_CACHE_SIZE = 4; 
+	public int[] literalSelectionCache;
+	public int literalSelectionCachePointer;
+
+	public static final int LITERAL_SELECTION_CACHE_SIZE = 8; 
 	
 	public SLiteralPool() {
 		positiveLiteralsHashMap = new HashMap<String, SLiteral>();
 		negativeLiteralsHashMap = new HashMap<String, SLiteral>();
 		literalSelectionList = new ArrayList<SLiteral>();
-		l1Cache = new int[L1_CACHE_SIZE];
-		l1CachePointer = 0;
+		literalSelectionCache = new int[LITERAL_SELECTION_CACHE_SIZE];
+		literalSelectionCachePointer = 0;
 	}
 	
 	public SLiteral getPositiveLiteralWithString(String s) {
@@ -57,7 +57,7 @@ public class SLiteralPool {
 		}
 	}
 	
-	public void sortLiteralSelectionList(){
+	public void preProcess(){
 		for (int i=0; i<literalSelectionList.size(); ++i) {
 			SLiteral literal = literalSelectionList.get(i);
 			SLiteral literalInverseCounterpart = literal.inverseCounterpart;
@@ -71,14 +71,15 @@ public class SLiteralPool {
 	public SLiteral getUnassignedLiteral(){
 		int literalSelectionListSize = this.literalSelectionList.size();
 		int i=0;
-		for (i=0; i<L1_CACHE_SIZE; ++i){
-			SLiteral l = literalSelectionList.get(l1Cache[i]);
+		for (i=0; i<LITERAL_SELECTION_CACHE_SIZE; ++i){
+			SLiteral l = literalSelectionList.get(literalSelectionCache[i]);
 			if (!l.assigned) { return l; }
 		}
+
 		for (i=0; i<literalSelectionListSize; ++i) {
 			SLiteral l = literalSelectionList.get(i);
 			if (!l.assigned) {
-				l1Cache[(l1CachePointer++)%L1_CACHE_SIZE] = i;
+				literalSelectionCache[(literalSelectionCachePointer++)%LITERAL_SELECTION_CACHE_SIZE] = i;
 				return l;
 			}
 		}

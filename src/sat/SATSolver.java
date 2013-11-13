@@ -56,7 +56,7 @@ public class SATSolver {
 		}
 		
 		//Prioritize the literals
-		solver.sLiteralPool.sortLiteralSelectionList();
+		solver.sLiteralPool.preProcess();
 		
 		//Starts the solving process
 		Boolean solvable = solver.attemptSolving(solver.clauses);
@@ -168,7 +168,8 @@ public class SATSolver {
     private void undoAssignmentsToLiteral(SLiteral s) {
     	while (assignedLiterals.peekLast()!=s) {
     		if (assignedLiterals.peekLast()==null) { return; }
-    		assignedLiterals.removeLast().setUnassigned();
+    		SLiteral lastLiteral = assignedLiterals.removeLast();
+    		lastLiteral.setUnassigned();
     	}
     }
     private boolean isSolved(ArrayList<SClause> subClauses){
