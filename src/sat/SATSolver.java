@@ -19,11 +19,27 @@ import sat.formula.Literal;
 import sat.formula.PosLiteral;
 
 
+
+/**
+ * This is the class that takes in a CNF (Conjunctive Normal Form) represented in an instance of Formula, 
+ * attempt to search for a possible solution and return one if there is.
+ * 
+ * Some Terminology:
+ * BCP 			- Boolean Constraint Propagation: Identifying Unit Clauses and setting them to evaluate to TRUE
+ * subClauses	- An Array of some the original Clauses. 
+ * 
+ * Class Dependencies:
+ * SClause, SLiteral, SLiteralPool
+ * 
+ * @author Kang Yue Sheng Benjamin
+ *
+ */
 public class SATSolver {
 
-	public SLiteralPool sLiteralPool;
-	public ArrayList<SClause> clauses;
-	public ArrayDeque<SLiteral> assignedLiterals;
+	public SLiteralPool sLiteralPool;  //An SLiteralPool to manage the creation and retrieval of SLiterals
+	public ArrayList<SClause> clauses; //An ArrayList of SClauses
+	public ArrayDeque<SLiteral> assignedLiterals; //A stack to keep track of which SLiterals have been assigned for backtracking
+	
 	
 	/**
 	 * Takes in a Formula representing a Boolean Satisfiability problem represented in CNF format.
@@ -47,10 +63,16 @@ public class SATSolver {
 				Literal literal = literalIterator.next();
 				String variable = literal.getVariable().toString();
 				if (literal instanceof PosLiteral) {
-					newClause.addLiteral(solver.sLiteralPool.getPositiveLiteralWithString(variable));
+					SLiteral literalToAdd = solver.sLiteralPool.getPositiveLiteralWithString(variable);
+					newClause.addLiteral(literalToAdd);
 				} else {
-					newClause.addLiteral(solver.sLiteralPool.getNegativeLiteralWithString(variable));
+					SLiteral literalToAdd = solver.sLiteralPool.getNegativeLiteralWithString(variable);
+					newClause.addLiteral(literalToAdd);
 				}
+			}
+			int newClauseSize = newClause.literals.size();
+			for (int i=0; i!=newClauseSize; ++i) {
+				newClause.literals.get(i).priority -= newClauseSize;
 			}
 			solver.clauses.add(newClause);
 		}
@@ -59,7 +81,7 @@ public class SATSolver {
 		solver.sLiteralPool.preProcess();
 		
 		//Starts the solving process
-		Boolean solvable = solver.attemptSolving(solver.clauses);
+		boolean solvable = solver.attemptSolving(solver.clauses);
         
 		//If a solution is found, it starts repackaging it in an Environment instance before returning it
 		if (solvable==false) {
@@ -68,10 +90,9 @@ public class SATSolver {
         	Environment environment = new Environment(); 
         	HashMap<String, SLiteral> literalsHashMap = solver.sLiteralPool.positiveLiteralsHashMap;
         	for (Map.Entry<String, SLiteral> entry : literalsHashMap.entrySet()) {
-        		String s = entry.getKey();
         		SLiteral l = entry.getValue();
         		if (l.assigned) { 
-        			environment = environment.put(new Variable(s), l.value ? Bool.TRUE:Bool.FALSE); 
+        			environment = environment.put(new Variable(entry.getKey()), l.value ? Bool.TRUE:Bool.FALSE); 
         		}
         	}
         	return environment;
@@ -82,14 +103,15 @@ public class SATSolver {
      * A private constructor. The SAT Solver is only to be used by its solve method.
      */
 	private SATSolver(int numberOfClauses){
-		this.sLiteralPool = new SLiteralPool();
-		this.clauses = new ArrayList<SClause>(numberOfClauses);
-		this.assignedLiterals = new ArrayDeque<SLiteral>();
+		//Initialize internal data structures.
+		this.sLiteralPool 			= new SLiteralPool();
+		this.clauses 				= new ArrayList	<SClause>(numberOfClauses);
+		this.assignedLiterals 		= new ArrayDeque<SLiteral>();
 	}
 
 	/**
 	 * This is the main recursive method of the DPLL algorithm
-	 * @return TRUE if the problem has a solution else FALSE. Leaves sLiteralPool containing the answer if TRUE.
+	 * @return TRUE if the problem has a solution, else FALSE. Leaves sLiteralPool containing the answer if TRUE.
 	 */
     private boolean attemptSolving(ArrayList<SClause> subClauses){
     	if (isSolved(subClauses)) { return true; } 	//If solved, end search
@@ -115,26 +137,38 @@ public class SATSolver {
     		return true;
     	}
     	undoAssignmentsToLiteral(lastLiteral);
-    	
     	return false;
     }
-
+    
+    /**
+     * Returns an ArrayList of SClause that are yet to be determined to be TRUE
+     * @param subClauses
+     * @return
+     */
     private ArrayList<SClause> notTrueSubClauses(ArrayList<SClause> subClauses) {
     	int subClausesSize = subClauses.size();
     	ArrayList<SClause> newSubClauses = new ArrayList<SClause>(subClausesSize>>3);
-    	for (int i=0; i<subClausesSize; ++i) {
+    	for (int i=0; i!=subClausesSize; ++i) {
     		SClause c = subClauses.get(i);
     		if (!c.isTrue()) { newSubClauses.add(c); }
     	}
     	return newSubClauses;
     }
     
+    /**
+     * This is the Boolean Constraint Propagation method.
+     * It can assign SLiterals to TRUE or FALSE by iterating through subClauses for "unit clauses". 
+     * It will push any newly assigned SLiterals into assignedLiterals
+     * Thus, care must be taken to unassign any SLiteral that has been assigned by it if necessary, such as backtracking.
+     * @param subClauses
+     * @return TRUE if no conflict has been found, otherwise FALSE.
+     */
     private boolean BCP(ArrayList<SClause> subClauses) {    	
     	boolean finished = false;
     	int subClausesSize = subClauses.size();
     	while (!finished) {
     		finished = true;
-        	for (int i=0; i<subClausesSize; ++i) {
+        	for (int i=0; i!=subClausesSize; ++i) {
         		SClause c = subClauses.get(i);
         		if (!c.ignoreByBCP){ //If clause has not yet been marked by BCP as ignorable
 	    			SLiteral unitLiteral = c.unassignedLiteralIfUnitClause();
@@ -157,14 +191,23 @@ public class SATSolver {
     	return true;
     }
 
+    /**
+     * A method used by BCP() to reset all SClauses marked as ignorableByBCP.
+     * Ignorable clauses are either already TRUE, or set to be TRUE by unit clause detection. 
+     * @param subClauses
+     */
     private void resetIgnoreByBCP(ArrayList<SClause> subClauses) {
     	int subClausesSize = subClauses.size();
-    	for (int i=0; i<subClausesSize; ++i) {
+    	for (int i=0; i!=subClausesSize; ++i) {
     		SClause c = subClauses.get(i);
     		c.ignoreByBCP = false;
     	}
     }
     
+    /**
+     * A method to read from the assignedLiterals stack and unassign all literals that have been added after SLiteral s
+     * @param s
+     */
     private void undoAssignmentsToLiteral(SLiteral s) {
     	while (assignedLiterals.peekLast()!=s) {
     		if (assignedLiterals.peekLast()==null) { return; }
@@ -172,13 +215,19 @@ public class SATSolver {
     		lastLiteral.setUnassigned();
     	}
     }
+    
+    /**
+     * Check if the subClauses consists entirely of SClauses that evaluate to TRUE
+     * @param subClauses
+     * @return TRUE if solved, otherwise FALSE
+     */
     private boolean isSolved(ArrayList<SClause> subClauses){
     	int subClausesSize = subClauses.size();
-    	for (int i=0; i<subClausesSize; ++i) {
+    	for (int i=0; i!=subClausesSize; ++i) {
     		SClause c = subClauses.get(i);
-    		if (!c.isTrue()) return false; //isTrue returns true if any of the literal inside is assigned and true.
+    		if (!c.isTrue()) return false; 
     	}
-    	return true; //True for empty subClauses too!
+    	return true; 
     }
 
 }

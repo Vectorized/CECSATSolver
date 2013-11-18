@@ -4,82 +4,119 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 
-
+/**
+ * This is a class to get instances of SLiterals from. It manages the creation and retrieval of SLiteral instances.
+ * 
+ * Class Dependencies:
+ * SClause, SLiteral, SATSolver
+ * 
+ * @author Kang Yue Sheng Benjamin
+ *
+ */
 public class SLiteralPool {
-	public HashMap<String, SLiteral> positiveLiteralsHashMap;
-	public HashMap<String, SLiteral> negativeLiteralsHashMap;
-	public ArrayList<SLiteral> literalSelectionList;
 	
-	public int[] literalSelectionCache;
-	public int literalSelectionCachePointer;
-
-	public static final int LITERAL_SELECTION_CACHE_SIZE = 8; 
+	public HashMap<String, SLiteral> positiveLiteralsHashMap; //A HashMap Containing all the Positive SLiterals with their names as keys
+	public HashMap<String, SLiteral> negativeLiteralsHashMap; //A HashMap Containing all the Negative SLiterals with their names as keys
 	
+	public ArrayList<SLiteral> literalSelectionList; //An ArrayList to store the Sliterals for optimized retrieval of unassigned SLiterals
+	public int literalSelectionListOffset;
+	
+	/**
+	 * Default constructor
+	 */
 	public SLiteralPool() {
+		//Initialize internal data structures
 		positiveLiteralsHashMap = new HashMap<String, SLiteral>();
 		negativeLiteralsHashMap = new HashMap<String, SLiteral>();
 		literalSelectionList = new ArrayList<SLiteral>();
-		literalSelectionCache = new int[LITERAL_SELECTION_CACHE_SIZE];
-		literalSelectionCachePointer = 0;
+		literalSelectionListOffset = 0;
 	}
 	
+	/**
+	 * A method to retrieve an instance of a Positive SLiteral represented by its name.
+	 *
+	 * @param s The name of the SLiteral
+	 * @return A Positive SLiteral
+	 */
 	public SLiteral getPositiveLiteralWithString(String s) {
-		if (positiveLiteralsHashMap.containsKey(s)) {
-			SLiteral literal = positiveLiteralsHashMap.get(s);
-			++literal.priority;
+		if (positiveLiteralsHashMap.containsKey(s)) { //If the SLiteral has already been made
+			SLiteral literal = positiveLiteralsHashMap.get(s);	
 			return literal;
-		} else {
-			SLiteral positiveLiteral = new SLiteral(/*isNegative*/false);
-			SLiteral negativeLiteral = new SLiteral(/*isNegative*/true);
+		} else { //Else if the SLiteral has not yet been made
+			SLiteral positiveLiteral = new SLiteral( /*isNegative*/ false);
+			SLiteral negativeLiteral = new SLiteral( /*isNegative*/ true);
 			negativeLiteral.setInverseCounterpart(positiveLiteral);
 			positiveLiteral.setInverseCounterpart(negativeLiteral);
 			positiveLiteralsHashMap.put(s, positiveLiteral);
 			negativeLiteralsHashMap.put(s, negativeLiteral);
-			literalSelectionList.add(positiveLiteral);
 			return positiveLiteral;
 		}
 	}
 	
+	/**
+	 * A method to retrieve an instance of a Negative SLiteral represented by its name.
+	 *
+	 * @param s The name of the SLiteral
+	 * @return A Negative SLiteral
+	 */
 	public SLiteral getNegativeLiteralWithString(String s){
-		if (negativeLiteralsHashMap.containsKey(s)) {
+		if (negativeLiteralsHashMap.containsKey(s)) { //If the SLiteral has already been made
 			SLiteral literal = negativeLiteralsHashMap.get(s);
-			++literal.priority;
 			return literal;
-		} else {
-			SLiteral negativeLiteral = new SLiteral(/*isNegative*/true);
-			SLiteral positiveLiteral = new SLiteral(/*isNegative*/false);
+		} else { //Else if the SLiteral has not yet been made
+			SLiteral negativeLiteral = new SLiteral( /*isNegative*/ true);
+			SLiteral positiveLiteral = new SLiteral( /*isNegative*/ false);
 			positiveLiteral.setInverseCounterpart(negativeLiteral);
 			negativeLiteral.setInverseCounterpart(positiveLiteral);
 			positiveLiteralsHashMap.put(s, positiveLiteral);
 			negativeLiteralsHashMap.put(s, negativeLiteral);
-			literalSelectionList.add(positiveLiteral);
 			return negativeLiteral;
 		}
 	}
 	
-	public void preProcess(){
-		for (int i=0; i<literalSelectionList.size(); ++i) {
-			SLiteral literal = literalSelectionList.get(i);
+	/**
+	 * Sorts literalSelectionList in descending order by the priority of each SLiteral.
+	 * Replaces the SLiteral in the list with its positive or negative counterpart, depending on which has more priority.
+	 * Assigns all unit literals.
+	 */
+	public void preProcess(){ 
+		for (SLiteral literal:positiveLiteralsHashMap.values()) {
 			SLiteral literalInverseCounterpart = literal.inverseCounterpart;
-			if (literalInverseCounterpart.priority>literal.priority) {
-				literalSelectionList.set(i, literalInverseCounterpart);
+			
+			if (literalInverseCounterpart.addCount==0) {  //Pure literal rule
+				literal.setEvalutateToTrue(); 
+			} 
+			else if (literal.addCount==0) { //Pure literal rule
+				literalInverseCounterpart.setEvalutateToTrue(); 
+			}
+			else if (literalInverseCounterpart.priority>literal.priority) {
+				literalSelectionList.add(literalInverseCounterpart);
+			} else {
+				literalSelectionList.add(literal);
 			}
 		}
-		Collections.sort(literalSelectionList);
+		Collections.sort(literalSelectionList); //Will be sorted in descending order due to the compareTo() function
 	}
 	
+	/**
+	 * Get an unassigned SLiteral based on its priority. Higher priority SLiterals are return first.
+	 * Recently accessed SLiterals are returned first if they are unassigned.
+	 * @return An unassigned SLiteral
+	 */
 	public SLiteral getUnassignedLiteral(){
 		int literalSelectionListSize = this.literalSelectionList.size();
 		int i=0;
-		for (i=0; i<LITERAL_SELECTION_CACHE_SIZE; ++i){
-			SLiteral l = literalSelectionList.get(literalSelectionCache[i]);
-			if (!l.assigned) { return l; }
-		}
-
-		for (i=0; i<literalSelectionListSize; ++i) {
+		for (i=literalSelectionListOffset; i!=literalSelectionListSize; ++i) {
 			SLiteral l = literalSelectionList.get(i);
 			if (!l.assigned) {
-				literalSelectionCache[(literalSelectionCachePointer++)%LITERAL_SELECTION_CACHE_SIZE] = i;
+				literalSelectionListOffset = i;
+				return l;
+			}
+		}
+		for (i=0; i!=literalSelectionListOffset; ++i) {
+			SLiteral l = literalSelectionList.get(i);
+			if (!l.assigned) {
+				literalSelectionListOffset = i;
 				return l;
 			}
 		}
